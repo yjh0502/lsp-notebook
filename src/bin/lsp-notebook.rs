@@ -78,7 +78,7 @@ impl LanguageServer for Backend {
         let lens = {
             let guard = self.tree.lock().unwrap();
             let nodes = match guard.get(&params.text_document.uri) {
-                Some(state) => lsp_notebook::code_actions(&state.tree),
+                Some(state) => lsp_notebook::code_actions(&state.tree, &state.content),
                 None => vec![],
             };
             nodes
@@ -120,6 +120,26 @@ impl LanguageServer for Backend {
             };
 
             let node = lsp_notebook::node_by_id(state.tree.root_node(), node_id).unwrap();
+            let code_content = lsp_notebook::code_content(node, &state.content);
+
+            use std::io::Write;
+            use std::process::{Command, Stdio};
+
+            let mut child = Command::new("/bin/sh")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("failed to execute child");
+
+            let mut stdin = child.stdin.take().expect("failed to get stdin");
+            std::thread::spawn(move || {
+                stdin
+                    .write_all(code_content.as_bytes())
+                    .expect("failed to write to stdin");
+            });
+
+            let output = child.wait_with_output().expect("failed to wait on child");
+            let stdout = std::str::from_utf8(&output.stdout).unwrap();
 
             let range = lsp_types::Range {
                 start: lsp_notebook::pos_ts_to_lsp(node.end_position()),
@@ -128,7 +148,7 @@ impl LanguageServer for Backend {
             changes.insert(
                 state.uri.clone(),
                 vec![TextEdit {
-                    new_text: "\nhello".to_owned(),
+                    new_text: format!("\n```output\n{}\n```", stdout),
                     range,
                 }],
             );

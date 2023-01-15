@@ -41,16 +41,38 @@ pub fn node_by_id(node: Node, id: usize) -> Option<Node> {
     None
 }
 
-fn collect_codes<'a>(node: Node<'a>, actions: &mut Vec<Node<'a>>) {
-    if node.kind() == "fenced_code_block" {
+fn info_string(node: Node, content: &str) -> String {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "info_string" {
+            return child.utf8_text(content.as_bytes()).unwrap().to_string();
+        }
+    }
+    String::new()
+}
+
+fn collect_codes<'a, 'b>(node: Node<'a>, content: &'b str, actions: &mut Vec<Node<'a>>) {
+    if node.kind() == "fenced_code_block" && info_string(node, content) != "output" {
         actions.push(node);
         return;
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_codes(child, actions);
+        collect_codes(child, content, actions);
     }
+}
+
+pub fn code_content(node: Node, content: &str) -> String {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() != "code_fence_content" {
+            continue;
+        }
+
+        return child.utf8_text(content.as_bytes()).unwrap().to_owned();
+    }
+    String::new()
 }
 
 pub fn parse(content: &str) -> Tree {
@@ -58,8 +80,8 @@ pub fn parse(content: &str) -> Tree {
     parser.parse(&content, None).unwrap()
 }
 
-pub fn code_actions(tree: &Tree) -> Vec<Node> {
+pub fn code_actions<'a, 'b>(tree: &'a Tree, content: &'b str) -> Vec<Node<'a>> {
     let mut actions = Vec::new();
-    collect_codes(tree.root_node(), &mut actions);
+    collect_codes(tree.root_node(), content, &mut actions);
     actions
 }
