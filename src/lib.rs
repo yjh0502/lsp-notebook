@@ -51,15 +51,15 @@ fn info_string(node: Node, content: &str) -> String {
     String::new()
 }
 
-fn collect_codes<'a, 'b>(node: Node<'a>, content: &'b str, actions: &mut Vec<Node<'a>>) {
-    if node.kind() == "fenced_code_block" && info_string(node, content) != "output" {
+fn collect_codeblocks<'a, 'b>(node: Node<'a>, content: &'b str, actions: &mut Vec<Node<'a>>) {
+    if node.kind() == "fenced_code_block" {
         actions.push(node);
         return;
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_codes(child, content, actions);
+        collect_codeblocks(child, content, actions);
     }
 }
 
@@ -80,8 +80,50 @@ pub fn parse(content: &str) -> Tree {
     parser.parse(&content, None).unwrap()
 }
 
-pub fn code_actions<'a, 'b>(tree: &'a Tree, content: &'b str) -> Vec<Node<'a>> {
+pub fn code_actions<'a, 'b>(tree: &'a Tree, content: &'b str) -> Vec<(Node<'a>, Option<Node<'a>>)> {
     let mut actions = Vec::new();
-    collect_codes(tree.root_node(), content, &mut actions);
-    actions
+    collect_codeblocks(tree.root_node(), content, &mut actions);
+
+    let mut pairs = vec![];
+    let mut i = 0;
+
+    while i < actions.len() {
+        let node = actions[i];
+        i += 1;
+        if i == actions.len() {
+            pairs.push((node, None));
+            break;
+        }
+        let next = actions[i];
+        let info_str = info_string(next, content);
+        if info_str == "output" {
+            pairs.push((node, Some(next)));
+            i += 1;
+        } else {
+            pairs.push((node, None));
+        }
+    }
+
+    pairs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_code_actions() {
+        let content = r#"
+```sh
+echo hello
+```
+```output
+hello
+```
+"#;
+
+        let tree = parse(content);
+        let actions = code_actions(&tree, content);
+        assert_eq!(actions.len(), 1);
+    }
 }

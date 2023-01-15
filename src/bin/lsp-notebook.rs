@@ -83,17 +83,21 @@ impl LanguageServer for Backend {
             };
             nodes
                 .into_iter()
-                .map(|node| lsp_types::CodeLens {
-                    range: lsp_notebook::node_range(node),
-                    command: Some(lsp_types::Command {
-                        title: "Run".to_string(),
-                        command: "lsp-notebook.run".to_string(),
-                        arguments: Some(vec![
-                            json!(params.text_document.uri.clone()),
-                            json!(node.id()),
-                        ]),
-                    }),
-                    data: None,
+                .map(|(node, output)| {
+                    let mut args = vec![json!(params.text_document.uri.clone()), json!(node.id())];
+                    if let Some(output) = output {
+                        args.push(json!(output.id()));
+                    }
+
+                    lsp_types::CodeLens {
+                        range: lsp_notebook::node_range(node),
+                        command: Some(lsp_types::Command {
+                            title: "Run".to_string(),
+                            command: "lsp-notebook.run".to_string(),
+                            arguments: Some(args),
+                        }),
+                        data: None,
+                    }
                 })
                 .collect()
         };
@@ -111,6 +115,10 @@ impl LanguageServer for Backend {
 
         let uri = Url::parse(params.arguments[0].as_str().unwrap()).unwrap();
         let node_id = params.arguments[1].as_u64().unwrap() as usize;
+        let output_id = params
+            .arguments
+            .get(2)
+            .map(|v| v.as_u64().unwrap() as usize);
 
         let mut changes = HashMap::new();
         {
@@ -141,14 +149,23 @@ impl LanguageServer for Backend {
             let output = child.wait_with_output().expect("failed to wait on child");
             let stdout = std::str::from_utf8(&output.stdout).unwrap();
 
-            let range = lsp_types::Range {
-                start: lsp_notebook::pos_ts_to_lsp(node.end_position()),
-                end: lsp_notebook::pos_ts_to_lsp(node.end_position()),
+            let range = match output_id {
+                Some(output_id) => {
+                    let output_node =
+                        lsp_notebook::node_by_id(state.tree.root_node(), output_id).unwrap();
+                    lsp_notebook::node_range(output_node)
+                }
+                None => lsp_types::Range {
+                    start: lsp_notebook::pos_ts_to_lsp(node.end_position()),
+                    end: lsp_notebook::pos_ts_to_lsp(node.end_position()),
+                },
             };
+            let newline = if output_id.is_some() { "" } else { "\n" };
+            info!("range={:?}", range);
             changes.insert(
                 state.uri.clone(),
                 vec![TextEdit {
-                    new_text: format!("\n```output\n{}\n```", stdout),
+                    new_text: format!("{}```output\n{}\n```", newline, stdout),
                     range,
                 }],
             );

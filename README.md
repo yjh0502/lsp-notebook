@@ -1,8 +1,7 @@
 ## hello
 
 ```sh
-echo hello
-hello world
+echo hello world
 ```
 
 ```sh
