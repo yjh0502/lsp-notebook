@@ -1,0 +1,20 @@
+[package]
+name = "lsp-notebook"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "*", features = ["full"] }
+tower-lsp = "*"
+log = "*"
+env_logger = "*"
+simplelog = "*"
+tree-sitter = "*"
+lsp-types = "*"
+serde_json = "*"
+serde = "*"
+
+[build-dependencies]
+cc = "*"
