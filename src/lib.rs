@@ -96,7 +96,7 @@ pub fn code_actions<'a, 'b>(tree: &'a Tree, content: &'b str) -> Vec<(Node<'a>, 
         }
         let next = actions[i];
         let info_str = info_string(next, content);
-        if info_str == "output" {
+        if info_str.starts_with("output") {
             pairs.push((node, Some(next)));
             i += 1;
         } else {
@@ -117,7 +117,7 @@ mod tests {
 ```sh
 echo hello
 ```
-```output
+```output status=0
 hello
 ```
 "#;

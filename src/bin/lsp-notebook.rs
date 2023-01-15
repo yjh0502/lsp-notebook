@@ -165,7 +165,7 @@ impl LanguageServer for Backend {
             changes.insert(
                 state.uri.clone(),
                 vec![TextEdit {
-                    new_text: format!("{}```output\n{}\n```", newline, stdout),
+                    new_text: format!("{}```output {}\n{}\n```", newline, output.status, stdout),
                     range,
                 }],
             );
