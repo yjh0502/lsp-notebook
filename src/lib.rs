@@ -63,16 +63,30 @@ fn collect_codeblocks<'a, 'b>(node: Node<'a>, content: &'b str, actions: &mut Ve
     }
 }
 
-pub fn code_content(node: Node, content: &str) -> String {
+pub fn code_content(node: Node, content: &str) -> (String, String) {
+    let mut code_info = String::new();
+    let mut code_content = String::new();
+
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        if child.kind() != "code_fence_content" {
-            continue;
+        if child.kind() == "info_string" {
+            code_info = child.utf8_text(content.as_bytes()).unwrap().to_owned();
         }
-
-        return child.utf8_text(content.as_bytes()).unwrap().to_owned();
+        if child.kind() == "code_fence_content" {
+            code_content = child.utf8_text(content.as_bytes()).unwrap().to_owned();
+        }
     }
-    String::new()
+    (code_info, code_content)
+}
+
+pub fn code_info_shell(info: &str) -> &'static str {
+    match info {
+        "py" | "python" => "/usr/bin/python",
+        "python3" => "/usr/bin/python3",
+        "bash" => "/bin/bash",
+        "sh" => "/bin/sh",
+        _ => "/bin/sh",
+    }
 }
 
 pub fn parse(content: &str) -> Tree {

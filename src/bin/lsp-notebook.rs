@@ -128,12 +128,18 @@ impl LanguageServer for Backend {
             };
 
             let node = lsp_notebook::node_by_id(state.tree.root_node(), node_id).unwrap();
-            let code_content = lsp_notebook::code_content(node, &state.content);
+            let (code_info, code_content) = lsp_notebook::code_content(node, &state.content);
+            let sh = lsp_notebook::code_info_shell(&code_info);
+
+            info!(
+                "exec info={:?}, sh={:?} code={:?}",
+                code_info, sh, code_content
+            );
 
             use std::io::Write;
             use std::process::{Command, Stdio};
 
-            let mut child = Command::new("/bin/sh")
+            let mut child = Command::new(sh)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .spawn()
